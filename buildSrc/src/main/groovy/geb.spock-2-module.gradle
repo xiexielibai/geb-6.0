@@ -1,0 +1,7 @@
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+dependencies {
+    testImplementation libs.spock.core
+}

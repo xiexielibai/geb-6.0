@@ -1,0 +1,68 @@
+class TestClass {
+    static at = {
+        $closureBody
+    }
+
+    def waitFor(Map params = [:], Closure closure) {
+        closure.call()
+    }
+
+    def refreshWaitFor(Map params = [:], Closure closure) {
+        closure.call()
+    }
+
+    def verifyAt() {
+        Closure verifier = getClass().at.clone()
+        verifier.delegate = this
+        verifier.resolveStrategy = Closure.DELEGATE_FIRST
+        verifier.call()
+    }
+
+    def at(Class type, Closure closure) {
+        closure.call()
+    }
+
+    boolean booleanMethod(boolean returned) {
+        returned
+    }
+
+    void voidMethod() {
+    }
+
+    static void staticVoidMethod() {
+    }
+
+    String nullReturningMethod() {
+        null
+    }
+
+    def runWaitFor() {
+        waitFor {
+            $closureBody
+        }
+    }
+
+    def runWaitForWithDisabledImplicitAssertions() {
+        waitFor(implicitAssertions: false) {
+            $closureBody
+        }
+    }
+
+    def runRefreshWaitFor() {
+        refreshWaitFor {
+            $closureBody
+        }
+    }
+
+    def runRefreshWaitForWithDisabledImplicitAssertions() {
+        refreshWaitFor(implicitAssertions: false) {
+            $closureBody
+        }
+    }
+
+    def runAt() {
+        at(TestClass) {
+            $closureBody
+        }
+    }
+}

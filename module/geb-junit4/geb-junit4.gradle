@@ -1,0 +1,27 @@
+plugins {
+    id 'geb.test-framework-integration-module'
+    id 'geb.dockerised-test'
+}
+
+dependencies {
+    implementation project(":module:geb-junit")
+    api libs.junit4
+
+    testRuntimeOnly libs.junit5.vintage.engine
+    testImplementation libs.junit5.jupiter.api
+}
+
+publishing.publications.main.pom {
+    name = "Geb for JUnit 4"
+    description = "Geb (pronounced \"jeb\") integration with the JUnit 4 test framework."
+}
+
+tasks.named("test") {
+    options {
+        excludeTags 'geb.junit4.DoNotRunFromGradle'
+    }
+}
+
+tasks.named("chromeLinuxTest") {
+    exclude "**/*Test.class"
+}

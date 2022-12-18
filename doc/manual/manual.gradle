@@ -1,0 +1,173 @@
+plugins {
+    alias(libs.plugins.asciidoc)
+    id 'java-platform'
+    id 'geb.publishing'
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    manual
+
+    groovydocClasspath
+    groovydocSources
+
+    snippets
+}
+
+project(":module").subprojects.each { apiModule ->
+    dependencies {
+        groovydocClasspath project(path: apiModule.path)
+        groovydocSources project(path: apiModule.path, configuration: "sources")
+    }
+}
+
+dependencies {
+    groovydocClasspath(project(":module:geb-core")) {
+        capabilities {
+            requireCapability("org.gebish:geb-core-select")
+        }
+    }
+
+    snippets project(path: ":doc:manual-snippets", configuration: "allSources")
+    snippets project(path: ":doc:manual-snippets:real-browser", configuration: "allSources")
+    snippets project(path: ":module:geb-core", configuration: "allSources")
+}
+
+def snippetsDirectory = new File(buildDir, "snippets")
+
+def snippetsTask = tasks.register("snippets", Sync) {
+    from configurations.snippets
+    into snippetsDirectory
+
+    include { fileTreeElement ->
+        def file = fileTreeElement.file
+        file.isDirectory() || file.withReader { reader ->
+            reader.any { it.contains("tag::") }
+        }
+    }
+
+    includeEmptyDirs = false
+}
+
+asciidoctorj {
+    options = [doctype: 'book']
+    attributes = [
+        toc                    : 'left',
+        encoding               : 'utf-8',
+        'snippets-dir'         : snippetsDirectory.absolutePath,
+        numbered               : true,
+        sectlinks              : true,
+        idprefix               : '',
+        idseparator            : '-',
+        icons                  : 'font',
+        'source-highlighter'   : 'coderay',
+        'geb-version'          : project.version,
+        'geb-group'            : project.group,
+        'geb-group-dir'        : project.group.replace('.', '/'),
+        'spock-core-version'   : libs.versions.spock.get(),
+        'selenium-version'     : libs.versions.selenium.get(),
+        'groovy-version'       : libs.versions.groovy.get(),
+        'sauce-connect-version': libs.versions.sauceConnect.get(),
+        'home-page'            : 'www.gebish.org',
+        docinfo1               : true,
+        linkcss                : true,
+        stylesheet             : 'css/style.css',
+        imagesdir              : 'images'
+    ]
+
+    modules {
+        groovyDsl {
+            version '2.0.2'
+        }
+    }
+
+    docExtensions project(":doc:asciidoctor-extension")
+}
+
+tasks.named("asciidoctor") {
+    sources {
+        include 'index.adoc'
+    }
+
+    resources {
+        from file('src/resources')
+    }
+
+    baseDirFollowsSourceDir()
+
+    inputs.files(snippetsTask)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+def groovydocSourcesTask = tasks.register("groovydocSources", Sync) {
+    inputs.files configurations.groovydocSources
+    from({ configurations.groovydocSources.files.collect { zipTree(it) } })
+    exclude 'META-INF/**'
+    into "$buildDir/groovydocSources"
+}
+
+def apiDocTask = tasks.register("apiDoc", Groovydoc) {
+    groovyClasspath = new GroovyRuntime(project).inferGroovyClasspath(configurations.groovydocClasspath)
+    classpath = configurations.groovydocClasspath
+    destinationDir = file("$buildDir/apiDoc")
+    source groovydocSourcesTask
+    access = GroovydocAccess.PROTECTED
+    processScripts = true
+    includeAuthor = false
+    includeMainForScripts = true
+}
+
+def packageManualTask = tasks.register("packageManual", Sync) {
+    into "$buildDir/manual"
+    from asciidoctor
+
+    into("api") {
+        from apiDocTask
+    }
+
+    includeEmptyDirs = false
+}
+
+def manualZipTask = tasks.register("manualZip", Zip) {
+    from packageManualTask
+    archiveBaseName = "geb-manual"
+}
+
+artifacts {
+    manual(packageManualTask.map { it.outputs.files.singleFile }) {
+        builtBy packageManualTask
+    }
+}
+
+publishing {
+    publications {
+        manual(MavenPublication) {
+            artifactId 'geb-manual'
+            artifact manualZipTask
+            pom {
+                name = "Geb Manual - The Book of Geb"
+                description = "Geb (pronounced \"jeb\") manual, user guide and API reference."
+            }
+        }
+    }
+}
+
+tasks.register("publishJarsAndManual") {
+    dependsOn 'publishManualPublicationToSonatypeRepository'
+}
+
+tasks.register("openManual") {
+    dependsOn "asciidoctor"
+    doLast {
+        new java.awt.Desktop().browse(fileTree(tasks.asciidoctor.outputDir).find { it.name == 'index.html' }.toURI())
+    }
+}
+
+idea {
+    module {
+        excludeDirs += file('build')
+    }
+}

@@ -1,0 +1,195 @@
+import geb.gradle.browserstack.BrowserStackAccount
+import geb.gradle.saucelabs.SauceAccount
+import geb.gradle.lambdatest.LambdaTestAccount
+
+plugins {
+    id 'geb.api-module'
+    id 'geb.dockerised-test'
+    alias(libs.plugins.webdriverBinaries)
+    id 'org.gebish.browserstack'
+    id 'org.gebish.saucelabs'
+    id 'org.gebish.lambdatest'
+    id 'geb.all-sources-configuration'
+}
+
+java {
+    registerFeature('select') {
+        usingSourceSet(sourceSets.main)
+    }
+}
+
+dependencies {
+    api libs.selenium.api
+
+    api project(":module:geb-ast")
+    api project(":module:geb-waiting")
+    api libs.threeTen.extra
+
+    implementation(libs.jodd.core)
+    implementation(libs.jodd.lagarto)
+
+    selectImplementation(libs.selenium.support)
+
+    testImplementation libs.cglib
+    testImplementation libs.jsoup
+    testImplementation libs.ratpack.groovyTest
+    testImplementation project(":internal:test-support-spock")
+
+    sauceConnect libs.sauceConnect
+}
+
+webdriverBinaries {
+    chromedriver {
+        version = "86.0.4240.22"
+        fallbackTo32Bit = true
+    }
+}
+
+tasks.named("test") {
+    maxParallelForks gebModule.maxWorkers
+}
+
+tasks.register("allCrossBrowserTests") {
+    dependsOn 'allSauceLabsTests', 'allBrowserStackTests', 'allDockerisedCrossBrowserTests', 'allLambdaTestTests'
+}
+
+def firefoxLinuxTestTask = tasks.register("firefoxLinuxTest", Test) {
+    maxHeapSize = "512m"
+    systemProperty "geb.dockerized.driver", "firefox"
+    maxParallelForks 2
+}
+
+tasks.named("chromeLinuxTest") {
+    maxParallelForks 2
+}
+
+tasks.named("allDockerisedCrossBrowserTests") {
+    dependsOn firefoxLinuxTestTask
+}
+
+tasks.register("localChromeTest", Test) {
+    maxHeapSize = "512m"
+    systemProperty "geb.local.driver", "chrome"
+}
+
+sauceLabs {
+    browsers {
+        safari_mac_15 {
+            capabilities platformName: "OS X 12", "sauce:options.seleniumVersion": libs.versions.selenium.get()
+        }
+    }
+    task {
+        maxHeapSize = "512m"
+        maxParallelForks 5
+        testLogging {
+            events "started", "skipped", "passed", "failed"
+        }
+    }
+    account {
+        username = System.getenv(SauceAccount.USER_ENV_VAR)
+        accessKey = System.getenv(SauceAccount.ACCESS_KEY_ENV_VAR)
+    }
+    connect {
+        timeout = 10 // minutes
+        identifier = UUID.randomUUID().toString()
+    }
+}
+
+browserStack {
+    def applicationAddresses = [8000, 8080, 9000, 9090, 9999].collect { "http://localhost:$it" }
+    application(*applicationAddresses)
+
+    browsers {
+        android {
+            capabilities "browserName": "chrome",
+                "bstack:options.deviceName": "Samsung Galaxy S22",
+                "bstack:options.realMobile": "true"
+        }
+        chrome_mac {
+            capabilities "browserVersion": "102.0",
+                "bstack:options.os": "OS X",
+                "bstack:options.osVersion": "Monterey",
+                "bstack:options.seleniumVersion": libs.versions.selenium.get()
+        }
+        chrome_windows {
+            capabilities "browserVersion": "102.0",
+                "bstack:options.os": "Windows",
+                "bstack:options.osVersion": "11",
+                "bstack:options.seleniumVersion": libs.versions.selenium.get()
+        }
+        firefox_mac {
+            capabilities "browserVersion": "101.0",
+                "bstack:options.os": "OS X",
+                "bstack:options.osVersion": "Monterey",
+                "bstack:options.seleniumVersion": libs.versions.selenium.get()
+        }
+        create("internet explorer_windows_11") {
+            capabilities "bstack:options.os": "Windows",
+                "bstack:options.osVersion": "10",
+                "bstack:options.seleniumVersion": libs.versions.selenium.get()
+        }
+        edge_windows {
+            capabilities "browserVersion": "101.0",
+                "bstack:options.os": "Windows",
+                "bstack:options.osVersion": "11",
+                "bstack:options.seleniumVersion": libs.versions.selenium.get()
+        }
+    }
+    task {
+        maxHeapSize = "512m"
+        maxParallelForks 5
+        testLogging {
+            events "started", "skipped", "passed", "failed"
+        }
+    }
+    account {
+        username = System.getenv(BrowserStackAccount.USER_ENV_VAR)
+        accessKey = System.getenv(BrowserStackAccount.ACCESS_KEY_ENV_VAR)
+    }
+    local {
+        identifier = UUID.randomUUID().toString()
+    }
+}
+
+lambdaTest {
+    browsers {
+        firefox_windows {
+            capabilities platformName: "Windows 11",
+            "browserVersion": "101.0",
+            "LT:Options.selenium_version": "4.1.2"
+        }
+    }
+    task {
+        maxHeapSize = "512m"
+        maxParallelForks 5
+        testLogging {
+            events "started", "skipped", "passed", "failed"
+        }
+    }
+    account {
+        username = System.getenv(LambdaTestAccount.USER_ENV_VAR)
+        accessKey = System.getenv(LambdaTestAccount.ACCESS_KEY_ENV_VAR)
+    }
+    tunnelOps {
+        tunnelName = UUID.randomUUID().toString()
+        port = "8090"
+    }
+}
+
+
+tasks.register("nonIeBrowserStackTests") {
+    dependsOn 'androidTest', 'chromeMacTest', 'chromeWindowsTest', 'firefoxMacTest'
+}
+
+tasks.register("ieBrowserStackTests") {
+    dependsOn 'internetExplorerWindows11Test', 'edgeWindowsTest'
+}
+
+publishing.publications.main {
+    suppressPomMetadataWarningsFor('selectApiElements')
+    suppressPomMetadataWarningsFor('selectRuntimeElements')
+    pom {
+        name = "Geb Core"
+        description = "Geb (pronounced \"jeb\") is a browser automation solution. It brings together the power of WebDriver, the elegance of jQuery content selection, the robustness of Page Object modelling and the expressiveness of the Groovy language."
+    }
+}

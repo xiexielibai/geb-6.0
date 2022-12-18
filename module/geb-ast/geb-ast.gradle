@@ -1,0 +1,12 @@
+plugins {
+    id 'geb.api-module'
+}
+
+publishing.publications.main.pom {
+    name = "Geb AST"
+    description = "Geb (pronounced \"jeb\") AST transformations module."
+}
+
+dependencies {
+    groovy "org.codehaus.groovy:groovy-macro"
+}

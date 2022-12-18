@@ -1,0 +1,9 @@
+plugins {
+    id 'geb.api-module'
+}
+
+dependencies {
+    api project(':module:geb-core')
+
+    testImplementation project(":internal:test-support")
+}

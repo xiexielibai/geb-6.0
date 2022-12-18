@@ -1,0 +1,18 @@
+plugins {
+    id 'geb.test-framework-integration-module'
+}
+
+dependencies {
+    api libs.testng
+}
+
+tasks.named("test") {
+    useTestNG {
+        excludeGroups "doNotRunFromGradle"
+    }
+}
+
+publishing.publications.main.pom {
+    name = "Geb for TestNG"
+    description = "Geb (pronounced \"jeb\") integration with the TestNG test framework."
+}

@@ -1,0 +1,11 @@
+plugins {
+    id 'geb.published-groovy-3-module'
+}
+
+configurations {
+    sources
+}
+
+artifacts {
+    sources tasks.named("sourcesJar")
+}

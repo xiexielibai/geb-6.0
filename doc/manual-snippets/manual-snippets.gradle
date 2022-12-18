@@ -1,0 +1,22 @@
+plugins {
+    id 'geb.groovy-3-module'
+    alias(libs.plugins.webdriverBinaries)
+    id 'geb.all-sources-configuration'
+}
+
+webdriverBinaries {
+    geckodriver "0.31.0"
+}
+
+dependencies {
+    testImplementation project(':internal:test-support-spock')
+    testImplementation project(':module:geb-spock')
+    testImplementation project(':doc:manual-snippets:fixtures')
+    testImplementation libs.commons.fileupload
+    testImplementation libs.systemLambda
+    testImplementation libs.junit.platform.testkit
+}
+
+tasks.named("test") {
+    maxParallelForks gebModule.maxWorkers
+}

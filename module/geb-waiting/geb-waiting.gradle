@@ -1,0 +1,19 @@
+plugins {
+    id 'geb.api-module'
+}
+
+dependencies {
+    // This is not strictly an API dependency.
+    // We list it as one so that it becomes a transitive dependency of geb-core and therefore
+    // making it available at compile time of client code, assuming that their dependency management
+    // system makes transitive compile dependencies first class compile dependencies.
+    api project(":module:geb-implicit-assertions")
+    api project(":module:geb-exceptions")
+
+    testImplementation project(":internal:test-support")
+}
+
+publishing.publications.main.pom {
+    name = "Geb Waiting"
+    description = "Geb (pronounced \"jeb\") waiting module."
+}

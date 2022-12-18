@@ -1,0 +1,33 @@
+plugins {
+    id 'geb.groovy-module'
+    id 'geb.spock-2-module'
+    id 'java-gradle-plugin'
+    id 'com.gradle.plugin-publish' version '0.16.0'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    groovy localGroovy()
+    implementation gradleApi()
+
+    implementation libs.guava
+
+    testImplementation libs.spock.core
+}
+
+pluginBundle {
+    website = "https://gebish.org/manual/current/#gradle-plugins"
+    vcsUrl = "https://github.com/geb/geb"
+    tags = ["geb", "testing", "cloud", "browser"]
+}
+
+apply from: 'plugin-definitions.gradle'
+
+tasks.register("publishJarsAndManual") {
+    if (!gebModule.isSnapshot()) {
+        dependsOn 'publishPlugins'
+    }
+}

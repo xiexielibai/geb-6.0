@@ -1,0 +1,315 @@
+version: 2
+jobs:
+  check:
+    docker:
+      - image: gebish/ci:v7
+    resource_class: large
+    environment:
+      GRADLE_OPTS: -Xmx1024m -XX:MaxMetaspaceSize=256m
+      GRADLE_USER_HOME: .gradle-home
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gradle-home-check-{{ .Branch }}
+            - gradle-home-check-master
+            - gradle-home-check
+      - run: ./gradlew --no-daemon --max-workers 4 --parallel -Pci module:check internal:check integration:check doc:site:check --continue
+      - store_test_results:
+          path: .
+      - store_artifacts:
+          path: build/reports
+      - save_cache:
+          key: gradle-home-check-{{ .Branch }}-{{ epoch }}
+          paths:
+            - .gradle-home
+  manual:
+    machine:
+      image: ubuntu-2204:2022.04.1
+    resource_class: large
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gradle-home-manual-machine-{{ .Branch }}
+            - gradle-home-manual-machine-master
+            - gradle-home-manual-machine
+      - run:
+          command: |
+            export WORKING_DIRECTORY=`pwd`
+            docker run -v ${WORKING_DIRECTORY}:${WORKING_DIRECTORY} -v /var/run/docker.sock:/var/run/docker.sock -w ${WORKING_DIRECTORY} -e OCI_WRITER_KEY_PASSPHRASE=$OCI_WRITER_KEY_PASSPHRASE gebish/ci:v7 /bin/bash -c "Xvfb :99 -screen 1 1280x1024x16 -nolisten tcp -fbdir /var/run > /dev/null 2>&1 & export DISPLAY=:99 ; GRADLE_OPTS=\"-Xmx1024m -XX:MaxMetaspaceSize=256m\" GRADLE_USER_HOME=\".gradle-home\" ./gradlew --no-daemon --max-workers 4 --parallel -Pci :doc:manual-snippets:check :doc:manual-snippets:fixtures:check :doc:manual-snippets:real-browser:check :doc:manual:build :doc:asciidoctor-extension:check"
+      - store_test_results:
+          path: .
+      - store_artifacts:
+          path: build/reports
+      - save_cache:
+          key: gradle-home-manual-machine-{{ .Branch }}-{{ epoch }}
+          paths:
+            - .gradle-home
+  dockerised-cross-browser:
+    machine:
+      image: ubuntu-2204:2022.04.1
+    resource_class: large
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gradle-home-dockerised-crossbrowser-{{ .Branch }}
+            - gradle-home-dockerised-crossbrowser-master
+            - gradle-home-dockerised-crossbrowser
+      - run:
+          command: |
+            export WORKING_DIRECTORY=`pwd`
+            docker run -v ${WORKING_DIRECTORY}:${WORKING_DIRECTORY} -v /var/run/docker.sock:/var/run/docker.sock -w ${WORKING_DIRECTORY} -e OCI_WRITER_KEY_PASSPHRASE=$OCI_WRITER_KEY_PASSPHRASE gebish/ci:v7 /bin/bash -c "GRADLE_OPTS=\"-Xmx1024m -XX:MaxMetaspaceSize=256m\" GRADLE_USER_HOME=\".gradle-home\" ./gradlew --no-daemon --max-workers 4 --parallel -Pci allDockerisedCrossBrowserTests"
+      - store_test_results:
+          path: .
+      - store_artifacts:
+          path: build/reports
+      - save_cache:
+          key: gradle-home-dockerised-crossbrowser-{{ .Branch }}-{{ epoch }}
+          paths:
+            - .gradle-home
+  local-cross-browser:
+    docker:
+      - image: gebish/ci:v10
+    resource_class: large
+    environment:
+        GRADLE_OPTS: -Xmx1024m -XX:MaxMetaspaceSize=256m
+        GRADLE_USER_HOME: .gradle-home
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gradle-home-local-crossbrowser-{{ .Branch }}
+            - gradle-home-local-crossbrowser-master
+            - gradle-home-local-crossbrowser
+      - run: ./gradlew --no-daemon --max-workers 4 --parallel -p module -Pci localChromeTest
+      - store_test_results:
+          path: .
+      - store_artifacts:
+          path: build/reports
+      - save_cache:
+          key: gradle-home-local-crossbrowser-{{ .Branch }}-{{ epoch }}
+          paths:
+            - .gradle-home
+  saucelabs:
+    docker:
+      - image: gebish/ci:v7
+    resource_class: large
+    environment:
+        GRADLE_OPTS: -Xmx1024m -XX:MaxMetaspaceSize=256m
+        GRADLE_USER_HOME: .gradle-home
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gradle-home-saucelabs-{{ .Branch }}
+            - gradle-home-saucelabs-master
+            - gradle-home-saucelabs
+      - run:
+          command: |
+            ./gradlew --no-daemon -Pci --max-workers 4 --parallel allSauceLabsTests
+      - store_test_results:
+          path: .
+      - store_artifacts:
+          path: build/reports
+      - save_cache:
+          key: gradle-home-saucelabs-{{ .Branch }}-{{ epoch }}
+          paths:
+            - .gradle-home
+  lambdatest:
+    docker:
+      - image: gebish/ci:v7
+    resource_class: large
+    environment:
+      GRADLE_OPTS: -Xmx1024m -XX:MaxMetaspaceSize=256m
+      GRADLE_USER_HOME: .gradle-home
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gradle-home-lambdatest-{{ .Branch }}
+            - gradle-home-lambdatest-master
+            - gradle-home-lambdatest
+      - run:
+          command: |
+            ./gradlew --no-daemon -Pci --max-workers 4 --parallel allLambdaTestTests
+      - store_test_results:
+          path: .
+      - store_artifacts:
+          path: build/reports
+      - save_cache:
+          key: gradle-home-lambdatest-{{ .Branch }}-{{ epoch }}
+          paths:
+            - .gradle-home
+  non-ie:
+    docker:
+      - image: gebish/ci:v7
+    resource_class: large
+    environment:
+        GRADLE_OPTS: -Xmx1024m -XX:MaxMetaspaceSize=256m
+        GRADLE_USER_HOME: .gradle-home
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gradle-home-non-ie-{{ .Branch }}
+            - gradle-home-non-ie-master
+            - gradle-home-non-ie
+      - run:
+          command: |
+            ./gradlew --no-daemon -Pci --max-workers 4 --parallel nonIeBrowserStackTests
+      - store_test_results:
+          path: .
+      - store_artifacts:
+          path: build/reports
+      - save_cache:
+          key: gradle-home-non-ie-{{ .Branch }}-{{ epoch }}
+          paths:
+            - .gradle-home
+  ie:
+    docker:
+      - image: gebish/ci:v7
+    resource_class: large
+    environment:
+        GRADLE_OPTS: -Xmx1024m -XX:MaxMetaspaceSize=256m
+        GRADLE_USER_HOME: .gradle-home
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gradle-home-ie-{{ .Branch }}
+            - gradle-home-ie-master
+            - gradle-home-ie
+      - run:
+          command: |
+            ./gradlew --no-daemon -Pci --max-workers 4 --parallel ieBrowserStackTests
+      - store_test_results:
+          path: .
+      - store_artifacts:
+          path: build/reports
+      - save_cache:
+          key: gradle-home-ie-{{ .Branch }}-{{ epoch }}
+          paths:
+            - .gradle-home
+  upload:
+    docker:
+      - image: gebish/ci:v7
+    resource_class: large
+    environment:
+        GRADLE_OPTS: -Xmx1024m -XX:MaxMetaspaceSize=256m
+        GRADLE_USER_HOME: .gradle-home
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gradle-home-upload-{{ .Branch }}
+            - gradle-home-upload-master
+            - gradle-home-upload
+      - run:
+          command: |
+            ./gradlew --no-daemon -Pci --max-workers 4 --parallel publishJarsAndManual
+      - save_cache:
+          key: gradle-home-upload-{{ .Branch }}-{{ epoch }}
+          paths:
+            - .gradle-home
+  publish-site:
+    docker:
+      - image: gebish/ci:v7
+    steps:
+      - checkout
+      - run:
+          command: |
+            git remote add heroku https://heroku:$HEROKU_API_KEY@git.heroku.com/gebish.git
+            git push -f heroku master
+  trigger-example-projects-4.x:
+    docker:
+      - image: gebish/ci:v7
+    steps:
+      - run:
+          command: |
+            curl -X POST -u ${CIRCLE_API_EXAMPLE_GRADLE_TOKEN}: https://circleci.com/api/v1.1/project/github/geb/geb-example-gradle/tree/4.x
+            curl -X POST -u ${CIRCLE_API_EXAMPLE_CUCUMBER_JVM_TOKEN}: https://circleci.com/api/v1.1/project/github/geb/geb-example-cucumber-jvm/tree/latest
+            curl -X POST -u ${CIRCLE_API_EXAMPLE_MAVEN_TOKEN}: https://circleci.com/api/v1.1/project/github/geb/geb-example-maven/tree/4.x
+            curl -H "Authorization: Bearer ${APPVEYOR_TOKEN}" -H "Content-type: application/json" -X POST https://ci.appveyor.com/api/builds -d '{"accountName": "erdi", "projectSlug": "geb-example-gradle", "branch": "4.x"}'
+  trigger-example-projects-master:
+    docker:
+      - image: gebish/ci:v7
+    steps:
+      - run:
+          command: |
+            curl -X POST -u ${CIRCLE_API_EXAMPLE_GRADLE_TOKEN}: https://circleci.com/api/v1.1/project/github/geb/geb-example-gradle/tree/latest
+            curl -X POST -u ${CIRCLE_API_EXAMPLE_MAVEN_TOKEN}: https://circleci.com/api/v1.1/project/github/geb/geb-example-maven/tree/latest
+            curl -H "Authorization: Bearer ${APPVEYOR_TOKEN}" -H "Content-type: application/json" -X POST https://ci.appveyor.com/api/builds -d '{"accountName": "erdi", "projectSlug": "geb-example-gradle", "branch": "latest"}'
+
+workflows:
+  version: 2
+  build-workflow:
+    jobs:
+      - check
+      - manual
+      - dockerised-cross-browser:
+          requires:
+            - check
+            - manual
+      - local-cross-browser:
+          requires:
+            - check
+            - manual
+      - saucelabs:
+          requires:
+            - check
+            - manual
+          filters:
+            branches:
+              ignore: /pull\/[0-9]+/
+      - lambdatest:
+          requires:
+            - check
+            - manual
+          filters:
+            branches:
+              ignore: /pull\/[0-9]+/
+      - non-ie:
+          requires:
+            - check
+            - manual
+          filters:
+            branches:
+              ignore: /pull\/[0-9]+/
+      - ie:
+          requires:
+            - non-ie
+          filters:
+            branches:
+              ignore: /pull\/[0-9]+/
+      - upload:
+          requires:
+            - dockerised-cross-browser
+            - local-cross-browser
+            - saucelabs
+            - lambdatest
+            - ie
+          filters:
+            branches:
+              only:
+                - master
+                - 4.x
+      - publish-site:
+          requires:
+            - upload
+          filters:
+            branches:
+              only: master
+      - trigger-example-projects-master:
+          requires:
+            - upload
+          filters:
+            branches:
+              only: master
+      - trigger-example-projects-4.x:
+          requires:
+            - upload
+          filters:
+            branches:
+              only: 4.x

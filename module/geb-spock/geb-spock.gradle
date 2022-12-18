@@ -1,0 +1,14 @@
+plugins {
+    id 'geb.test-framework-integration-module'
+    id 'geb.dockerised-test'
+}
+
+dependencies {
+    api libs.spock.core
+    testImplementation libs.junit.platform.testkit
+}
+
+publishing.publications.main.pom {
+    name = "Geb for Spock"
+    description = "Geb (pronounced \"jeb\") integration with the Spock test framework."
+}

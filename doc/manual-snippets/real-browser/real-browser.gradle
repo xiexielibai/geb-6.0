@@ -1,0 +1,13 @@
+plugins {
+    id 'geb.groovy-3-module'
+    id 'geb.all-sources-configuration'
+}
+
+dependencies {
+    testImplementation project(':internal:test-support-spock')
+    testImplementation project(':doc:manual-snippets:fixtures')
+}
+
+tasks.named("test") {
+    shouldRunAfter ':doc:manual-snippets:test'
+}

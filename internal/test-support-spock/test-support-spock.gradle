@@ -1,0 +1,8 @@
+plugins {
+	id 'geb.groovy-3-module'
+}
+
+dependencies {
+	api project(':internal:test-support')
+	api project(':module:geb-spock')
+}

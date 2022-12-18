@@ -1,0 +1,8 @@
+def chromeLinuxTestTask = tasks.register("chromeLinuxTest", Test) {
+    maxHeapSize = "512m"
+    systemProperty "geb.dockerized.driver", "chrome"
+}
+
+tasks.register("allDockerisedCrossBrowserTests") {
+    dependsOn chromeLinuxTestTask
+}

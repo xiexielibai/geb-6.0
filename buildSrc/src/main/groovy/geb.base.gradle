@@ -1,0 +1,111 @@
+/*
+ * Copyright 2021 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import org.gebish.gradle.BaseExtension
+import org.ysb33r.grolifant.api.core.OperatingSystem
+import geb.gradle.EnvironmentVariablesCommandLineArgumentProvider
+
+plugins {
+    id 'geb.coordinates'
+}
+
+extensions.create('gebModule', BaseExtension, project)
+
+repositories {
+    mavenCentral()
+}
+
+gebModule {
+    onCi {
+        plugins.withType(ReportingBasePlugin) {
+            def projectDirPath = project.path.substring(1).replaceAll(":", "/")
+            def copyTask = tasks.register("copyReportsIntoRoot", Copy) {
+                into "${rootProject.buildDir}/reports/${projectDirPath}"
+                from reporting.baseDir
+            }
+            tasks.withType(Reporting).configureEach { reportingTask ->
+                reportingTask.finalizedBy copyTask
+            }
+        }
+
+        tasks.withType(Test).configureEach {
+            testLogging {
+                showStackTraces = true
+                exceptionFormat "full"
+            }
+        }
+    }
+}
+
+tasks.withType(Test).configureEach {
+    maxHeapSize = "768m"
+    jvmArgs '-XX:MaxMetaspaceSize=192m'
+
+    testLogging {
+        exceptionFormat = 'full'
+    }
+
+    inputs.property("isWindows", OperatingSystem.current().windows)
+
+    def gebReportsDir = reporting.file("geb/$name")
+    outputs.dir(gebReportsDir)
+    jvmArgumentProviders.add(
+        new EnvironmentVariablesCommandLineArgumentProvider('geb.build.reportsDir': gebReportsDir.absolutePath)
+    )
+
+    afterSuite { desc, result ->
+        if (!desc.parent) {
+            if (result.testCount == 0) {
+                throw new IllegalStateException("No tests were found")
+            }
+        }
+    }
+
+    systemProperty 'jna.nosys', 'true'
+}
+
+tasks.withType(Groovydoc).configureEach {
+    exclude "**/internal/**"
+
+    link "http://docs.oracle.com/javase/8/docs/api/",
+        "java.net",
+        "java.util",
+        "java.lang",
+        "java.io"
+
+    link "http://static.javadoc.io/org.seleniumhq.selenium/selenium-api/${libs.versions.selenium.get()}",
+        "org.openqa.selenium"
+
+    link "http://static.javadoc.io/org.spockframework/spock-core/${libs.versions.spock.get()}",
+        "spock.lang"
+
+    link "http://static.javadoc.io/org.junit.jupiter/junit-jupiter-api/${libs.versions.junit5.get()}",
+        "org.junit.jupiter.api"
+
+    link "http://static.javadoc.io/junit/junit/${libs.versions.junit4.get()}",
+        "org.junit"
+
+    link "http://static.javadoc.io/org.threeten/threeten-extra/${libs.versions.threeTen.get()}",
+        "org.threeten.extra"
+
+    link "http://docs.groovy-lang.org/docs/groovy-${libs.versions.groovy.get()}/html/api/",
+        "groovy.lang"
+
+    def docName = project.name == "manual" ? "Geb" : project.name
+    docTitle = "Groovy API Documentation for $docName $version"
+    footer = "<p style='text-align: center'>Groovy API Documentation for $docName $version - Licensed under the Apache License, Version 2.0 - <a href='http://www.gebish.org'>http://www.gebish.org</a></p>"
+    windowTitle = "Groovy API for $docName $version"
+}

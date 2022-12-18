@@ -1,0 +1,444 @@
+= Cloud browser testing
+
+When you want to perform web testing on multiple browsers and operating systems, it can be quite complicated to maintain machines for each of the target environments.
+There are a few companies that provide "remote web browsers as a service", making it easy to do this sort of matrix testing without having to maintain the multiple browser installations yourself.
+Geb provides easy integration with three such services, link:https://saucelabs.com/[SauceLabs], link:http://www.browserstack.com/[BrowserStack] and link:https://lambdatest.com/[LambdaTest].
+This integration includes two parts: assistance with creating a driver in `GebConfig.groovy` and a Gradle plugin.
+
+== Creating a driver
+
+For all three SauceLabs, BrowserStack and LambdaTest, a special driver factory is provided that, given a browser specification as well as an username and access key, creates an instance of `RemoteWebDriver` configured
+to use a browser in the cloud.
+Examples of typical usage in `GebConfig.groovy` are included below.
+They will configure Geb to run in SauceLabs/BrowserStack/LambdaTest if the appropriate system property is set, and if not it will use whatever driver that is configured.
+This is useful if you want to run the code in a local browser for development.
+In theory you could use any system property to pass the browser specification but `geb.saucelabs.browser`/`geb.browserstack.browser`/`geb.lambdatest.browser` are also used by the Geb Gradle plugins, so it's a good idea to
+stick with those property names.
+
+The first parameter passed to the `create()` method is a ”browser specification“ and it should be a list of required browser capabilities in Java properties file format:
+
+----
+browserName=«browser name as per values of fields in org.openqa.selenium.remote.BrowserType»
+platformName=«platform as per enum item names in org.openqa.selenium.Platform»
+browserVersion=«version»
+----
+
+Assuming you're using the following snippet in your `GebConfig.groovy` to execute your code via SauceLabs with Firefox 19 on Linux, you would set the `geb.saucelabs.browser` system property to:
+
+----
+browserName=firefox
+platformName=LINUX
+browserVersion=19
+----
+
+and to execute it with IE 9 on Vista to:
+
+----
+browserName=internet explorer
+platformName=VISTA
+browserVersion=19=9
+----
+
+Some browsers like Chrome automatically update to the latest version; for these browsers you don't need to specify the version as there's only one, and you would use something like:
+
+----
+browserName=chrome
+platformName=MAC
+----
+
+as the ”browser specification“. For a full list of available browsers, versions and operating systems refer to your cloud provider's documentation:
+
+* link:https://saucelabs.com/platforms[SauceLabs platform list]
+* link:http://www.browserstack.com/list-of-browsers-and-platforms?product=automate[BrowserStack Browsers and Platforms list]
+* link:https://www.lambdatest.com/list-of-browsers[LambdaTest platform and browser list]
+
+Please note that Geb Gradle plugins can set the `geb.saucelabs.browser`/`geb.browserstack.browser`/`geb.lambdatest.browser` system properties for you using the aforementioned format.
+
+Following the browser specification are the username and access key used to identify your account with the cloud provider.
+The example uses two environment variables to access this information.
+This is usually the easiest way of passing something secret to your build in open CI services like link:https://drone.io/[drone.io] or link:https://travis-ci.org/[Travis CI] if your code is public, but you can
+use other mechanisms if desired.
+
+You can optionally pass additional configuration settings by providing a Map to the `create()` method as the last parameter.
+Since Selenium 4 you will need to use a vendor prefix for any capabilities that are not link:https://www.w3.org/TR/webdriver1/#capabilities[W3C compliant].
+So for example to specify Selenium version to be used in SauceLabs you will use `sauce:options.seleniumVersion` as the capability key where `sauce:options` is the vendor prefix and `seleniumVersion` is the vendor specific capability key.
+The configuration options available are described in your cloud provider's documentation:
+
+* link:https://wiki.saucelabs.com/display/DOCS/Test+Configuration+Options[SauceLabs additional config]
+* link:http://www.browserstack.com/automate/capabilities[BrowserStack Capabilities]
+* link:https://www.lambdatest.com/capabilities-generator/[LambdaTest capabilities]
+
+Finally, there is also link:api/geb/driver/CloudDriverFactory.html#create(java.lang.String,%20java.lang.String,%20java.lang.String,%20Map)[an overloaded version of `create()` method] available that
+doesn't take a string specification and allows you to simply specify all the required capabilities using a map.
+This method might be useful if you just want to use the factory, but don't need the build level parametrization.
+
+[[sauce-labs-driver-factory]]
+=== `SauceLabsDriverFactory`
+
+The following is an example of utilizing `SauceLabsDriverFactory` in `GebConfig.groovy` to configure a driver that will use a browser provided in the SauceLabs cloud.
+
+[source,groovy]
+----
+def sauceLabsBrowser = System.getProperty("geb.saucelabs.browser")
+if (sauceLabsBrowser) {
+    driver = {
+       def username = System.getenv("GEB_SAUCE_LABS_USER")
+       assert username
+       def accessKey = System.getenv("GEB_SAUCE_LABS_ACCESS_PASSWORD")
+       assert accessKey
+       new SauceLabsDriverFactory().create(sauceLabsBrowser, username, accessKey)
+    }
+}
+----
+
+By default `SauceLabsDriverFactory` creates `RemoteWebDriver` instances connected to SauceLabs' US data center.
+If you wish to use a different data center then simply pass the host name for the given data center to the constructor.
+The below examples shows uses the hostname of the EU data center:
+
+[source,groovy]
+----
+new SauceLabsDriverFactory("ondemand.eu-central-1.saucelabs.com")
+----
+
+[[browser-stack-driver-factory]]
+=== `BrowserStackDriverFactory`
+
+The following is an example of utilizing `BrowserStackDriverFactory` in `GebConfig.groovy` to configure a driver that will use a browser provided in the BrowserStack cloud.
+
+[source,groovy]
+----
+def browserStackBrowser = System.getProperty("geb.browserstack.browser")
+if (browserStackBrowser) {
+    driver = {
+       def username = System.getenv("GEB_BROWSERSTACK_USERNAME")
+       assert username
+       def accessKey = System.getenv("GEB_BROWSERSTACK_AUTHKEY")
+       assert accessKey
+       new BrowserStackDriverFactory().create(browserStackBrowser, username, accessKey)
+    }
+}
+----
+
+If using `localIdentifier` support:
+
+[source,groovy]
+----
+def browserStackBrowser = System.getProperty("geb.browserstack.browser")
+if (browserStackBrowser) {
+    driver = {
+       def username = System.getenv("GEB_BROWSERSTACK_USERNAME")
+       assert username
+       def accessKey = System.getenv("GEB_BROWSERSTACK_AUTHKEY")
+       assert accessKey
+       def localId = System.getenv("GEB_BROWSERSTACK_LOCALID")
+       assert localId
+       new BrowserStackDriverFactory().create(browserStackBrowser, username, accessKey, localId)
+    }
+}
+----
+
+
+[[lambda-test-driver-factory]]
+=== `LambdaTestDriverFactory`
+
+The following is an example of utilizing `LambdaTestDriverFactory` in `GebConfig.groovy` to configure a driver that will use a browser provided in the LambdaTest cloud.
+
+[source,groovy]
+----
+def lambdaTestBrowser = System.getProperty("geb.lambdatest.browser")
+if (lambdaTestBrowser) {
+    driver = {
+       def username = System.getenv("GEB_LAMBDATEST_USERNAME")
+       assert username
+       def accessKey = System.getenv("GEB_LAMBDATEST_AUTHKEY")
+       assert accessKey
+       new LambdaTestDriverFactory().create(lambdaTestBrowser, username, accessKey)
+    }
+}
+----
+
+If using `TunnelIdentifier` support:
+
+[source,groovy]
+----
+def lambdaTestBrowser = System.getProperty("geb.lambdatest.browser")
+if (lambdaTestBrowser) {
+    driver = {
+       def username = System.getenv("GEB_LAMBDATEST_USERNAME")
+       assert username
+       def accessKey = System.getenv("GEB_LAMBDATEST_AUTHKEY")
+       assert accessKey
+       def tunnelName = System.getenv("GEB_LAMBDATEST_TUNNEL_NAME")
+       assert tunnelName
+       new LambdaTestDriverFactory().create(lambdaTestBrowser, username, accessKey, tunnelName)
+    }
+}
+----
+
+== Gradle plugins
+
+For SauceLabs, BrowserStack and LambdaTest, Geb provides a Gradle plugin which simplifies declaring the account and browsers that are desired, as well as configuring a tunnel to allow the cloud provider to
+access local applications.
+These plugins allow easily creating multiple `Test` tasks that will have the appropriate `geb.PROVIDER.browser` property set (where _PROVIDER_ is either `saucelabs`, `browserstack` or `lambdatest`).
+The value of that property can be then passed in configuration file to <<sauce-labs-driver-factory>>/<<browser-stack-driver-factory>>/<<lambda-test-driver-factory>> as the ”browser specification“.
+Examples of typical usage are included below.
+
+=== geb-saucelabs plugin
+
+Following is an example of using the geb-saucelabs Gradle plugin.
+
+[source,groovy,subs="attributes,verbatim"]
+----
+import geb.gradle.saucelabs.SauceAccount
+
+plugins {
+    id "org.gebish.saucelabs" version "{geb-version}" //<1>
+}
+
+dependencies { //<2>
+    sauceConnect "com.saucelabs:ci-sauce:{sauce-connect-version}"
+}
+
+sauceLabs {
+    browsers { //<3>
+       firefox_linux_19
+       chrome_mac
+       delegate."internet explorer_vista_9"
+       nexus4 { //<4>
+         capabilities(
+            browserName: "android",
+            platformName: "Linux",
+            browserVersion: "4.4",
+            "sauce:options.deviceName": "LG Nexus 4"
+         )
+       }
+    }
+    task { //<5>
+       maxHeapSize = "512m"
+    }
+    additionalTask("quick") { //<6>
+        useJUnit {
+            includeCategories "com.example.Quick"
+        }
+    }
+    account { //<7>
+       username = System.getenv(SauceAccount.USER_ENV_VAR)
+       accessKey = System.getenv(SauceAccount.ACCESS_KEY_ENV_VAR)
+    }
+    connect { //<8>
+       port = 4444 //<9>
+       additionalOptions = ['--proxy', 'proxy.example.com:8080'] //<10>
+    }
+}
+----
+<1> Apply the plugin to the build.
+<2> Declare version of SauceConnect to be used as part of the `sauceConnect` configuration. This will be used by tasks that open a {sauce-connect} tunnel before
+running the generated test tasks which means that the browsers in the cloud will have localhost pointing at the machine running the build.
+<3> Declare that tests should run in 3 different browsers using the shorthand syntax; this will generate the following `Test` tasks: `firefoxLinux19Test`, `chromeMacTest` and
+`internet explorerVista9Test`.
+<4> Explicitly specify the required browser capabilities if the shorthand syntax doesn't allow you to express all needed capabilities; the example will generate a `Test` task named `nexus4Test`.
+<5> Configure all of the generated test tasks; for each of them the closure is run with delegate set to a test task being configured.
+<6> Add an additional test task for each of the browsers with the string passed as the first argument prepended to the task name; the closure passed as the last argument is run with delegate set to the test task being added.
+<7> Pass credentials for {sauce-connect}.
+<8> Additionally configure {sauce-connect} if desired.
+<9> Override the port used by SauceConnect, defaults to 4445.
+<10> Pass additional link:https://docs.saucelabs.com/dev/cli/sauce-connect-proxy#sauce-connect-proxy-command-line-options[command line options] to SauceConnect.
+
+[TIP]
+====
+You can use `allSauceLabsTests` task that will depend on all of the generated test tasks to run all of them during a build.
+====
+
+
+:numbered!:
+
+==== Disabling SauceConnect
+
+The plugin by default manages the lifecycle of an instance of SauceConnect which allows to point the browsers provisioned at SauceLabs at urls which are accessible from localhost but not from the Internet.
+
+If you are pointing the browsers only at urls which are accessible on the Internet and wish to get rid of the overhead associated with opening the tunnel you might want to disable the use of SauceConnect.
+It can be done in the following way:
+
+[source,groovy,subs="attributes,verbatim"]
+----
+sauceLabs {
+    useTunnel = false
+}
+----
+
+:numbered:
+
+=== geb-browserstack plugin
+
+Following is an example of using the geb-browserstack Gradle plugin.
+
+[source,groovy,subs="attributes,verbatim"]
+----
+import geb.gradle.browserstack.BrowserStackAccount
+
+plugins {
+    id "org.gebish.browserstack" version "{geb-version}" <1>
+}
+
+browserStack {
+    application 'http://localhost:8080' //<2>
+    browsers { //<3>
+       firefox_mac_19
+       chrome_mac
+       delegate."internet explorer_windows_9"
+       nexus4 { //<4>
+         capabilities browserName: "android", platformName: "ANDROID", "bstack:options.device": "Google Nexus 4"
+       }
+    }
+    task { //<5>
+       maxHeapSize = "512m"
+    }
+    additionalTask("quick") { //<6>
+        useJUnit {
+            includeCategories "com.example.Quick"
+        }
+    }
+    account { //<7>
+       username = System.getenv(BrowserStackAccount.USER_ENV_VAR)
+       accessKey = System.getenv(BrowserStackAccount.ACCESS_KEY_ENV_VAR)
+    }
+    local {
+        force = true //<8>
+        tunnelReadyMessage = 'You can now access your local server(s) in our remote browser' //<9>
+    }
+}
+----
+<1> Apply the plugin to the build.
+<2> Specify which urls the BrowserStack Tunnel should be able to access.
+Multiple applications can be specified.
+If no applications are specified, the tunnel will not be restricted to particular URLs.
+<3> Declare that tests should run in 3 different browsers using the shorthand syntax; this will generate the following `Test` tasks: `firefoxLinux19Test`, `chromeMacTest` and
+`internet explorerVista9Test`.
+<4> Explicitly specify the required browser capabilities if the shorthand syntax doesn't allow you to express all needed capabilities; the example will generate a `Test` task named `nexus4Test`.
+<5> Configure all of the generated test tasks; for each of them the closure is run with delegate set to a test task being configured.
+<6> Add an additional test task for each of the browsers with the string passed as the first argument prepended to the task name; the closure passed as the last argument is run with delegate set to the test task being added.
+<7> Pass credentials for BrowserStack.
+<8> Configure BrowserStack tunnel to route all traffic via the local machine; this configuration property controls the `-forcelocal` flag and the default value for it is `false`.
+<9> Set a custom message searched for in BrowserStack tunnel process output before considering it successfully started - useful if the output of the process has changed and the default message is no longer found.
+
+It's also possible to specify location and credentials for the proxy to be used with the BrowserStack Tunnel:
+
+[source,groovy,subs="attributes,verbatim"]
+----
+browserStack {
+    local {
+        proxyHost = '127.0.0.1'
+        proxyPort = '8080'
+        proxyUser = 'user'
+        proxyPass = 'secret'
+    }
+}
+----
+
+As well as the tunnel id and any other link:https://www.browserstack.com/local-testing#modifiers[command line options] necessary:
+
+[source,groovy,subs="attributes,verbatim"]
+----
+browserStack {
+    local {
+        id = 'Custom id'
+        additionalOptions = ['--log-file', '/tmp/browser-stack-local.log']
+    }
+}
+----
+
+[TIP]
+====
+You can use `allBrowserStackTests` task that will depend on all of the generated test tasks to run all of them during a build.
+====
+
+:numbered!:
+
+==== Disabling BrowserStack Tunnel
+
+The plugin by default manages the lifecycle of a tunnel which allows to point the browsers provisioned at BrowserStack at urls which are accessible from localhost but not from the Internet.
+
+If you are pointing the browsers only at urls which are accessible on the Internet and wish to get rid of the overhead associated with opening the tunnel you might want to disable the use of it.
+It can be done in the following way:
+
+[source,groovy,subs="attributes,verbatim"]
+----
+browserStack {
+    useTunnel = false
+}
+----
+
+:numbered:
+
+
+=== geb-lambdatest plugin
+
+Following is an example of using the geb-lambdatest Gradle plugin.
+
+[source,groovy,subs="attributes,verbatim"]
+----
+import geb.gradle.lambdatest.LambdaTestAccount
+
+plugins {
+    id "org.gebish.lambdatest" version "{geb-version}" //<1>
+}
+
+lambdaTest {
+    application 'http://localhost:8080' //<2>
+    browsers { //<3>
+        chrome_windows_70 {
+           capabilities platformName: "Windows 10" //<4>
+        }
+    }
+    task { //<5>
+       maxHeapSize = "512m"
+    }
+    additionalTask("quick") { //<6>
+        useJUnit {
+            includeCategories "com.example.Quick"
+        }
+    }
+    account { //<7>
+       username = System.getenv(LambdaTestAccount.USER_ENV_VAR)
+       accessKey = System.getenv(LambdaTestAccount.ACCESS_KEY_ENV_VAR)
+    }
+    tunnelOps {
+        additionalOptions = ['--proxyhost', 'proxy.example.com'] //<8>
+        tunnelReadyMessage = 'Secure connection established, you may start your tests now' //<9>
+    }
+}
+----
+<1> Apply the plugin to the build.
+<2> Specify which urls the LambdaTest Tunnel should be able to access.
+Multiple applications can be specified.
+If no applications are specified, the tunnel will not be restricted to particular URLs.
+<3> The tests would run in chrome on Windows 10 as sample.
+<4> Explicitly specify the required browser capabilities if the shorthand syntax doesn't allow you to express all needed capabilities.
+<5> Configure all of the generated test tasks; for each of them the closure is run with delegate set to a test task being configured.
+<6> Add an additional test task for each of the browsers with the string passed as the first argument prepended to the task name; the closure passed as the last argument is run with delegate set to the test task being added.
+<7> Pass credentials for LambdaTest.
+<8> Pass additional link:https://www.lambdatest.com/support/docs/lambda-tunnel-modifiers/[command line options] to LambdaTestTunnel.
+<9> Set a custom message searched for in LambdaTest tunnel process output before considering it successfully started - useful if the output of the process has changed and the default message is no longer found.
+
+
+[TIP]
+====
+You can use `allLambdaTestTests` task that will depend on all of the generated test tasks to run all of them during a build.
+====
+
+:numbered!:
+
+==== Disabling LambdaTest Tunnel
+
+The plugin by default manages the lifecycle of a tunnel which allows to point the browsers provisioned at LambdaTest at urls which are accessible from localhost but not from the Internet.
+
+If you are pointing the browsers only at urls which are accessible on the Internet and wish to get rid of the overhead associated with opening the tunnel you might want to disable the use of it.
+It can be done in the following way:
+
+[source,groovy,subs="attributes,verbatim"]
+----
+lambdaTest {
+    useTunnel = false
+}
+----
+

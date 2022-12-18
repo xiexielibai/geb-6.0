@@ -1,0 +1,68 @@
+import java.time.Duration
+
+plugins {
+    id 'geb.coordinates'
+    alias(libs.plugins.nexusPublish)
+    alias(libs.plugins.asl2)
+    alias(libs.plugins.extendedIdea)
+}
+
+configurations {
+    site
+}
+
+dependencies {
+    site project(path: 'doc:site', configuration: 'distribution')
+}
+
+nexusPublishing {
+    repositories {
+        sonatype {
+            stagingProfileId = "c1802e5c2fe49"
+            username.set(providers.gradleProperty("sonatypeOssUsername").forUseAtConfigurationTime())
+            password.set(providers.gradleProperty("sonatypeOssPassword").forUseAtConfigurationTime())
+        }
+    }
+
+    clientTimeout = Duration.ofSeconds(300)
+    connectTimeout = Duration.ofSeconds(60)
+
+    transitionCheckOptions {
+        maxRetries.set(60)
+        delayBetween.set(Duration.ofMillis(3000))
+    }
+}
+
+extensions.findByName("gradleEnterprise")?.buildScan {
+    termsOfServiceUrl = 'https://gradle.com/terms-of-service'
+    termsOfServiceAgree = 'yes'
+}
+
+tasks.register("stage", Sync) {
+    from configurations.site
+    into 'deploy'
+}
+
+ideaProjectComponents { components ->
+    components.file "gradle/idea/codeStyle.xml"
+    components.file "gradle/idea/codeStyleGroovy.xml"
+}
+
+idea {
+    project {
+        jdkName "1.8"
+
+        wildcards += ['good-conf.groovy', 'gebScript*.groovy']
+    }
+
+    extended {
+        workspace {
+            junit {
+                tasks = [
+                    ':integration:geb-gradle:classes', ':integration:geb-gradle:pluginUnderTestMetadata',
+                    ':doc:site:generateResources'
+                ]
+            }
+        }
+    }
+}

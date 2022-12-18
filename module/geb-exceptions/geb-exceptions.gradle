@@ -1,0 +1,8 @@
+plugins {
+    id 'geb.api-module'
+}
+
+publishing.publications.main.pom {
+    name = "Geb Exceptions"
+    description = "Common exceptions used by different Geb (pronounced \"jeb\") modules."
+}

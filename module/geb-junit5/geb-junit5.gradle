@@ -1,0 +1,20 @@
+plugins {
+    id 'geb.test-framework-integration-module'
+}
+
+dependencies {
+    api libs.junit5.jupiter.api
+
+    implementation project(":module:geb-junit")
+
+    testImplementation libs.junit.platform.launcher
+    testImplementation libs.junit5.jupiter.params
+    testImplementation libs.jsoup
+
+    testRuntimeOnly libs.junit5.jupiter.engine
+}
+
+publishing.publications.main.pom {
+    name = "Geb for JUnit 5"
+    description = "Geb (pronounced \"jeb\") integration with the JUnit 5 test framework."
+}
